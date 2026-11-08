@@ -31,6 +31,7 @@ dialog{border:1px solid var(--bd);border-radius:14px;background:var(--card);colo
 dialog::backdrop{background:rgba(0,0,0,.4)}
 label{display:block;margin:8px 0 2px;font-size:13px;color:var(--mu)}dialog input,dialog select{width:100%}
 .row{display:flex;gap:8px}.row>*{flex:1}
+#em,#pw{width:100%}html,body{overflow-x:hidden}
 </style></head><body><div class="wrap">
 <h1>📚 教室借用・收費・課表</h1><div class="mu" style="margin:-6px 0 8px"><span id="who"></span> <button id="lo" style="display:none;padding:2px 10px;font-size:12px" onclick="auth.signOut()">登出</button></div>
 <div class="tabs" id="tabs"></div><div id="app"></div></div>
@@ -163,7 +164,7 @@ function recalc(){
  go()}
 async function enter(u){
  reset();me.id=u.uid;me.name=u.displayName||u.email||'使用者';me.email=u.email||'';
- try{me.admin=(await DB.doc('admins/'+u.uid).get()).exists}catch(e){}
+ try{me.admin=(await DB.doc('admins/'+u.uid).get()).exists;me.err=''}catch(e){me.err=e.code||e.message}
  if(me.admin){
   unsubs.push(DB.collection('members').onSnapshot(s=>{S.mem={};s.docs.forEach(d=>S.mem[d.id]=d.data());L.mem=1;recalc()},perr),
    DB.collection('pending').onSnapshot(s=>{S.pend=mapd(s);go()},perr),DB.collection('roles').onSnapshot(rcb,perr));rsub=1;
@@ -176,7 +177,7 @@ function go(){
  const m=S.mem[me.id],r=m&&S.roles.find(x=>x.id==m.role);me.perms=r?r.perms:null;me.student=m?m.student||'':'';
  $('#who').textContent=me.name+'・'+(me.admin?'管理者':r?r.name:'未授權')+(me.student?'・'+me.student:'');$('#lo').style.display='';
  const load=()=>{$('#tabs').innerHTML='';$('#app').innerHTML='<div class="card mu">載入中…</div>'};
- const unauth=()=>{$('#tabs').innerHTML='';$('#app').innerHTML=`<div class="card"><b>${esc(me.name)}，你好</b><p>你還沒有被指派身分。已通知管理者，核准後請重新整理頁面。</p><button onclick="location.reload()">重新整理</button></div>`};
+ const unauth=()=>{$('#tabs').innerHTML='';$('#app').innerHTML=`<div class="card"><b>${esc(me.name)}，你好</b><p>你還沒有被指派身分。已通知管理者，核准後請重新整理頁面。</p><p class="mu" style="word-break:break-all">你的 UID：${esc(me.id)}${me.err?'<br>管理者檢查錯誤：'+esc(me.err):'<br>（資料庫裡沒有找到對應這個 UID 的 admins 文件）'}</p><button onclick="location.reload()">重新整理</button></div>`};
  if(!L.mem&&!me.admin)return load();
  if(me.admin){if(!L.mem||!L.roles)return load()}else{if(!m)return unauth();if(!L.roles)return load();if(!r)return unauth()}
  if(!(L.bk&&L.st))return load();
@@ -185,7 +186,7 @@ function go(){
  $('#tabs').innerHTML=T.map(([k,x])=>`<button class="${tab==k?'on':''}" onclick="tab='${k}';go()">${x}</button>`).join('');
  $('#app').innerHTML={cal:vCal,fee:vFee,tt:vTT,adm:vAdm}[tab]()}
 function showLogin(){$('#tabs').innerHTML='';$('#lo').style.display='none';$('#who').textContent='';
- $('#app').innerHTML=`<div class="card" style="max-width:380px;margin:30px auto"><b style="font-size:18px">🔒 登入</b><label>Email</label><input id="em" type="email" autocomplete="username"><label>密碼</label><input id="pw" type="password" autocomplete="current-password"><div id="le" style="color:var(--wa);min-height:22px;margin-top:6px"></div><div class="bar"><button class="pri" onclick="li()">登入</button><button onclick="su()">註冊新帳號</button></div><button style="width:100%" onclick="gl()">用 Google 登入</button><div class="mu" style="margin-top:8px">第一次登入後，需要管理者核准加入。</div></div>`}
+ $('#app').innerHTML=`<div class="card" style="max-width:380px;width:100%;margin:30px auto"><b style="font-size:18px">🔒 登入</b><label>Email</label><input id="em" type="email" autocomplete="username"><label>密碼</label><input id="pw" type="password" autocomplete="current-password"><div id="le" style="color:var(--wa);min-height:22px;margin-top:6px"></div><div class="bar"><button class="pri" onclick="li()">登入</button><button onclick="su()">註冊新帳號</button></div><button style="width:100%" onclick="gl()">用 Google 登入</button><div class="mu" style="margin-top:8px">第一次登入後，需要管理者核准加入。</div></div>`}
 const lerr=e=>{const k={'auth/invalid-credential':'帳號或密碼錯誤','auth/invalid-email':'Email 格式不正確','auth/email-already-in-use':'此 Email 已註冊，請直接登入','auth/weak-password':'密碼至少 6 碼','auth/missing-password':'請輸入密碼','auth/popup-closed-by-user':'','auth/unauthorized-domain':'此網址尚未加入 Firebase 的授權網域'};$('#le').textContent=e.code in k?k[e.code]:e.message};
 const li=()=>auth.signInWithEmailAndPassword($('#em').value.trim(),$('#pw').value).catch(lerr);
 const su=()=>auth.createUserWithEmailAndPassword($('#em').value.trim(),$('#pw').value).catch(lerr);
