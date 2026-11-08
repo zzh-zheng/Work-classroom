@@ -43,7 +43,7 @@ label{display:block;margin:8px 0 2px;font-size:13px;color:var(--mu)}dialog input
 window.onerror=(m,s,l)=>{const a=document.getElementById('app');if(a)a.innerHTML='<div class="card"><b>發生錯誤</b><p>'+m+'（第 '+l+' 行）</p></div>'};
 const $=s=>document.querySelector(s);
 const firebaseConfig={apiKey:"AIzaSyCoeJtARpH7Dn1jV4LwAANbF2zt-20wD2g",authDomain:"work-classroom.firebaseapp.com",projectId:"work-classroom",storageBucket:"work-classroom.firebasestorage.app",messagingSenderId:"535332868950",appId:"1:535332868950:web:6d8ed62ea7099a25b23cf7",measurementId:"G-KYLE6VKV9V"};
-let S={bk:[],st:[],roles:[],mem:{},pend:[],room:300},DB=null,auth=null,me={admin:false,id:null,name:'',email:'',perms:null,student:''};
+let S={bk:[],st:[],roles:[],mem:{},pend:[],wk:[],room:300},DB=null,auth=null,me={admin:false,id:null,name:'',email:'',perms:null,student:''};
 const can=p=>me.admin||!!(me.perms&&me.perms[p]);
 const wr=async f=>{try{await f()}catch(e){alert('儲存失敗：'+(e.message||e.code||e))}};
 const pad=n=>String(n).padStart(2,'0');
@@ -64,22 +64,23 @@ let F={st:'',pu:'',rs:'',pd:'',from:'',to:''};
 const flt=r=>S.bk.filter(b=>(can('all')||b.student===me.student)&&(!F.st||b.student===F.st)&&(!F.pu||b.purpose===F.pu)&&(!F.rs||(F.rs==='1')===!!b.resched)&&(!F.pd||(F.pd==='1')===!!b.paid)&&(!r||((!F.from||b.date>=F.from)&&(!F.to||b.date<=F.to)))).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
 const stOpts=(sel,all)=>(all?'<option value="">全部學生</option>':'')+S.st.map(s=>`<option ${s.name===sel?'selected':''}>${esc(s.name)}</option>`).join('');
 function fbar(r){return `<div class="bar sw">${can('all')?`<select onchange="F.st=this.value;go()">${stOpts(F.st,1)}</select>`:''}
-<select onchange="F.pu=this.value;go()"><option value="">全部用途</option>${['家教','其他'].map(p=>`<option ${F.pu==p?'selected':''}>${p}</option>`).join('')}</select>
+<select onchange="F.pu=this.value;go()"><option value="">全部用途</option>${['家教','其他'].concat(me.admin?['工作']:[]).map(p=>`<option ${F.pu==p?'selected':''}>${p}</option>`).join('')}</select>
 <select onchange="F.rs=this.value;go()"><option value="">調課不拘</option><option value="1" ${F.rs=='1'?'selected':''}>僅調課</option><option value="0" ${F.rs=='0'?'selected':''}>未調課</option></select>
 ${r?`<select onchange="F.pd=this.value;go()"><option value="">繳費不拘</option><option value="1" ${F.pd=='1'?'selected':''}>已收</option><option value="0" ${F.pd=='0'?'selected':''}>未收</option></select><input type="date" value="${F.from}" onchange="F.from=this.value;go()"> ~ <input type="date" value="${F.to}" onchange="F.to=this.value;go()">
 <button onclick="qm(0)">本月</button><button onclick="qm(-1)">上月</button><button onclick="F.from=F.to='';go()">全部期間</button>`:''}</div>`}
 function qm(k){const n=new Date();const a=new Date(n.getFullYear(),n.getMonth()+k,1),b=new Date(n.getFullYear(),n.getMonth()+k+1,0);F.from=fd(a);F.to=fd(b);go()}
-const chip=b=>`<div class="chip" style="--h:${col(b.student||b.purpose)}" onclick="event.stopPropagation();edit('${b.id}')">${b.start}-${b.end} ${esc(b.student||b.purpose)}${b.resched?' 🔁'+(mode=='month'?'':'（原'+b.orig.slice(5)+'）'):''}</div>`;
+const wflt=r=>(me.admin&&!F.st&&(!F.pu||F.pu=='工作')&&!F.rs&&!F.pd)?S.wk.filter(w=>!r||((!F.from||w.date>=F.from)&&(!F.to||w.date<=F.to))).map(w=>Object.assign({w:1,purpose:'工作',student:''},w)):[];
+const chip=b=>b.w?`<div class="chip" style="--h:${col(b.job)};border-left-style:dashed" onclick="event.stopPropagation();edit('${b.id}')">${b.start}-${b.end} 💼${esc(b.job)}</div>`:`<div class="chip" style="--h:${col(b.student||b.purpose)}" onclick="event.stopPropagation();edit('${b.id}')">${b.start}-${b.end} ${esc(b.student||b.purpose)}${b.resched?' 🔁'+(mode=='month'?'':'（原'+b.orig.slice(5)+'）'):''}</div>`;
 function step(n){if(mode=='month')cur=new Date(cur.getFullYear(),cur.getMonth()+n,1);else cur=add(cur,mode=='week'?7*n:n);go()}
 function vCal(){
  let ds,title;
  if(mode=='month'){const s=mon(new Date(cur.getFullYear(),cur.getMonth(),1));ds=[...Array(42)].map((_,i)=>add(s,i));title=cur.getFullYear()+'年'+(cur.getMonth()+1)+'月'}
  else if(mode=='week'){const s=mon(cur);ds=[...Array(7)].map((_,i)=>add(s,i));title=fd(s)+' ~ '+fd(add(s,6))}
  else{ds=[cur];title=fd(cur)+'（週'+wd(cur)+'）'}
- const L=flt(0),today=fd(new Date());
+ const L=flt(0).concat(wflt(0)),today=fd(new Date());
  const cell=d=>{const k=fd(d),it=L.filter(b=>b.date==k),out=mode=='month'&&d.getMonth()!=cur.getMonth();
   return `<div class="cell ${mode!='month'?'big':''} ${out?'out':''} ${k==today?'today':''}" onclick="edit(null,'${k}')"><b>${mode=='day'?'':d.getDate()}</b>${mode!='month'?`<span class="mu"> ${mode=='day'?'':d.getMonth()+1+'/'+d.getDate()+' '}週${wd(d)}</span>`:''}${it.map(chip).join('')}</div>`};
- const inV=L.filter(b=>b.date>=fd(ds[0])&&b.date<=fd(ds[ds.length-1])&&(mode!='month'||pdt(b.date).getMonth()==cur.getMonth()));
+ const inV=L.filter(b=>!b.w&&b.date>=fd(ds[0])&&b.date<=fd(ds[ds.length-1])&&(mode!='month'||pdt(b.date).getMonth()==cur.getMonth()));
  return `<div class="bar sw"><button onclick="step(-1)">‹</button><button onclick="cur=new Date();go()">今天</button><button onclick="step(1)">›</button><b>${title}</b><span class="sp"></span>
  ${['month','week','day'].map(m=>`<button class="${mode==m?'on':''}" onclick="mode='${m}';go()">${{month:'月',week:'週',day:'日'}[m]}</button>`).join('')}${can('edit')?'<button class="pri" onclick="edit()">＋ 新增借用</button>':''}</div>${fbar(0)}
  <div class="mu" style="margin-bottom:6px">本頁 ${inV.length} 堂，共 ${fh(inV.reduce((a,b)=>a+hrs(b),0))}</div>
@@ -90,20 +91,25 @@ const ks=()=>[...S.st.map(s=>s.name),'其他用途'];
 const rin=b=>!can('all')||!RF[b.student||'其他用途'];
 function rt(i){const k=ks()[i];RF[k]=!RF[k];try{localStorage.setItem('rf',JSON.stringify(RF))}catch(e){}go()}
 function roomBox(){return `<div class="card"><b>教室費計入哪些學生</b><div class="mu">取消勾選的學生，時數不算進教室費（只影響教室費，不影響學生收費）。</div><div class="bar" style="margin-top:8px">${ks().map((k,i)=>`<label style="margin:0;display:flex;gap:4px;align-items:center;color:var(--tx)"><input type="checkbox" style="width:auto" ${RF[k]?'':'checked'} onchange="rt(${i})">${esc(k)}</label>`).join('')}</div></div>`}
+function workBox(){const W=wflt(1).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start)),m={};
+ W.forEach(w=>{const o=m[w.job]=m[w.job]||{c:0,h:0,a:0};o.c++;o.h+=hrs(w);o.a+=hrs(w)*w.rate});
+ const ns=Object.keys(m),tot=ns.reduce((a,n)=>a+m[n].a,0);
+ return `<div class="card"><b>其他工作</b> <span class="mu">合計 ${money(tot)}</span><div class="scroll"><table><tr><th>工作</th><th class="r">次數</th><th class="r">總時數</th><th class="r">金額</th></tr>${ns.map(n=>`<tr><td>${esc(n)}</td><td class="r">${m[n].c}</td><td class="r">${fh(m[n].h)}</td><td class="r">${money(m[n].a)}</td></tr>`).join('')||'<tr><td colspan=4 class="mu">沒有符合的工作紀錄</td></tr>'}</table></div>
+ <div class="scroll" style="margin-top:8px"><table><tr><th>日期</th><th>時間</th><th>工作</th><th class="r">時薪</th><th class="r">時數</th><th class="r">金額</th></tr>${W.map(w=>`<tr onclick="edit('${w.id}')" style="cursor:pointer"><td>${w.date}（${wd(pdt(w.date))}）</td><td>${w.start}-${w.end}</td><td>${esc(w.job)}</td><td class="r">${money(w.rate)}</td><td class="r">${hrs(w)}</td><td class="r">${money(hrs(w)*w.rate)}</td></tr>`).join('')}</table></div></div>`}
 function vFee(){
  const L=flt(1),m={};
  L.forEach(b=>{if(b.purpose=='家教'&&b.student){const o=m[b.student]=m[b.student]||{c:0,h:0};o.c++;o.h+=hrs(b);o.p=(o.p||0)+(b.paid?hrs(b)*rate(b.student):0)}});
  const names=Object.keys(m),inc=names.reduce((a,n)=>a+m[n].h*rate(n),0),pa=names.reduce((a,n)=>a+(m[n].p||0),0),H=L.filter(rin).reduce((a,b)=>a+hrs(b),0),HA=L.reduce((a,b)=>a+hrs(b),0),rc=H*S.room;
  return fbar(1)+`<div class="sum"><div>學生收費合計<b>${money(inc)}</b></div><div>已收<b>${money(pa)}</b></div><div>未收<b>${money(inc-pa)}</b></div><div>${can('all')?'教室總借用':'總時數'}<b>${fh(H)}</b>${can('all')&&HA!=H?`<span class="mu">全部 ${fh(HA)}，已排除 ${fh(HA-H)}</span>`:''}</div>${can('all')?`<div>教室費用（${money(S.room)}/時）<b>${money(rc)}</b></div><div>收入 − 教室費<b>${money(inc-rc)}</b></div>`:''}</div>
- ${can('pay')?`<div class="bar"><button onclick="payAll(true)">目前篩選結果全部標為已收</button><button onclick="payAll(false)">全部標為未收</button></div>`:''}${can('all')?roomBox():''}<div class="card"><b>學生統計</b><div class="scroll"><table><tr><th>學生</th><th class="r">堂數</th><th class="r">總時數</th><th class="r">時薪</th><th class="r">金額</th><th class="r">已收</th><th class="r">未收</th></tr>
+ ${can('pay')?`<div class="bar"><button onclick="payAll(true)">目前篩選結果全部標為已收</button><button onclick="payAll(false)">全部標為未收</button></div>`:''}${me.admin?workBox():''}${can('all')?roomBox():''}<div class="card"><b>學生統計</b><div class="scroll"><table><tr><th>學生</th><th class="r">堂數</th><th class="r">總時數</th><th class="r">時薪</th><th class="r">金額</th><th class="r">已收</th><th class="r">未收</th></tr>
  ${names.map(n=>`<tr><td>${esc(n)}</td><td class="r">${m[n].c}</td><td class="r">${fh(m[n].h)}</td><td class="r">${money(rate(n))}</td><td class="r">${money(m[n].h*rate(n))}</td><td class="r">${money(m[n].p||0)}</td><td class="r">${money(m[n].h*rate(n)-(m[n].p||0))}</td></tr>`).join('')||'<tr><td colspan=7 class="mu">沒有符合的家教資料</td></tr>'}
  </table></div></div>
  <div class="card"><b>明細</b><div class="scroll"><table><tr><th>日期</th><th>時間</th><th>用途</th><th>學生</th><th>調課</th><th class="r">時數</th><th class="r">學生金額</th><th>繳費</th>${can('all')?'<th class="r">教室費</th>':''}</tr>
  ${L.map(b=>`<tr onclick="edit('${b.id}')" style="cursor:pointer"><td>${b.date}（${wd(pdt(b.date))}）</td><td>${b.start}-${b.end}</td><td>${b.purpose}</td><td>${esc(b.student)}</td><td>${b.resched?'調自 '+b.orig:''}</td><td class="r">${hrs(b)}</td><td class="r">${b.purpose=='家教'?money(hrs(b)*rate(b.student)):''}</td><td onclick="event.stopPropagation()">${b.purpose=='家教'?(can('pay')?`<input type="checkbox" style="width:auto" ${b.paid?'checked':''} onchange="pay('${b.id}',this.checked)"> `:'')+(b.paid?'已收 '+(b.paidDate||'').slice(5):'未收'):''}</td>${can('all')?`<td class="r">${rin(b)?money(hrs(b)*S.room):'—'}</td>`:''}</tr>`).join('')}</table></div></div>`}
 function vTT(){
- const days=[...Array(7)].map((_,i)=>add(ttw,i)),L=flt(0);
+ const days=[...Array(7)].map((_,i)=>add(ttw,i)),L=flt(0).concat(wflt(0));
  let h=`<div class="bar sw"><button onclick="ttw=add(ttw,-7);go()">‹ 上週</button><button onclick="ttw=mon(new Date());go()">本週</button><button onclick="ttw=add(ttw,7);go()">下週 ›</button><b>${fd(ttw)} ~ ${fd(add(ttw,6))}</b></div>${fbar(0)}<div class="card scroll"><div class="tt"><div><div class="th"></div>${[...Array(15)].map((_,i)=>`<div class="tl">${pad(8+i)}:00</div>`).join('')}</div>`;
- days.forEach(d=>{const k=fd(d);h+=`<div><div class="th">週${wd(d)} ${d.getMonth()+1}/${d.getDate()}</div><div class="tb" onclick="edit(null,'${k}')">${L.filter(b=>b.date==k).map(b=>{const t=Math.max(0,(tm(b.start)-480)*44/60),ht=Math.max(20,hrs(b)*44-2);return `<div class="blk" style="--h:${col(b.student||b.purpose)};top:${t}px;height:${ht}px" onclick="event.stopPropagation();edit('${b.id}')"><b>${esc(b.student||b.purpose)}</b>${b.resched?' 🔁':''}<br>${b.start}-${b.end}</div>`}).join('')}</div></div>`});
+ days.forEach(d=>{const k=fd(d);h+=`<div><div class="th">週${wd(d)} ${d.getMonth()+1}/${d.getDate()}</div><div class="tb" onclick="edit(null,'${k}')">${L.filter(b=>b.date==k).map(b=>{const t=Math.max(0,(tm(b.start)-480)*44/60),ht=Math.max(20,hrs(b)*44-2);return `<div class="blk" style="--h:${col(b.w?b.job:b.student||b.purpose)};top:${t}px;height:${ht}px" onclick="event.stopPropagation();edit('${b.id}')"><b>${b.w?'💼'+esc(b.job):esc(b.student||b.purpose)}</b>${b.resched?' 🔁':''}<br>${b.start}-${b.end}</div>`}).join('')}</div></div>`});
  return h+'</div></div>'}
 const permL=[['all','看全部學生'],['edit','新增/修改借用'],['fee','看收費'],['pay','標記繳費']];
 function vAdm(){const st=n=>`DB.doc('${n}')`;return `<div class="card"><b>身分（角色）</b><div class="mu">擁有此頁編輯權限的人＝管理者，自動具備全部權限。其他人由你在下方指派身分。</div>
@@ -126,36 +132,45 @@ function imp(el){const f=el.files[0];if(!f)return;const r=new FileReader();r.onl
  if(!confirm('要匯入 '+d.bk.length+' 筆借用紀錄嗎？'))return;
  wr(async()=>{for(const s of d.st||[])if(!S.st.some(x=>x.name===s.name))await DB.collection('students').add({name:s.name,rate:s.rate||0});
  for(const b of d.bk)await DB.doc('bookings/'+b.id).set(b);if(d.room)await DB.doc('settings/main').set({room:d.room});alert('匯入完成')})};r.readAsText(f)}
-function edit(id,date){if(!can('edit'))return;
- const b=id?S.bk.find(x=>x.id==id):{date:date||fd(new Date()),start:'18:00',end:'20:00',purpose:'家教',student:(S.st[0]||{}).name||'',resched:0,orig:''};
- $('#dlg').innerHTML=`<b>${id?'編輯':'新增'}借用</b><label>日期（實際上課日）</label><input type="date" id="f_d" value="${b.date}">
+function edit(id,date){
+ if(!can('edit'))return;
+ const w=id&&S.wk.find(x=>x.id==id);
+ const b=w?{date:w.date,start:w.start,end:w.end,purpose:'工作',student:'',resched:0,orig:'',job:w.job,rate:w.rate}:id?S.bk.find(x=>x.id==id):{date:date||fd(new Date()),start:'18:00',end:'20:00',purpose:'家教',student:(S.st[0]||{}).name||'',resched:0,orig:''};
+ const P=['家教','其他'].concat(me.admin?['工作']:[]),jobs=[...new Set(S.wk.map(x=>x.job))];
+ $('#dlg').innerHTML=`<b>${id?'編輯':'新增'}行程</b><label>日期</label><input type="date" id="f_d" value="${b.date}">
  <div class="row"><div><label>開始</label><input type="time" id="f_s" value="${b.start}"></div><div><label>結束</label><input type="time" id="f_e" value="${b.end}"></div></div>
- <label>用途</label><select id="f_p" onchange="$('#f_sw').style.display=this.value=='家教'?'':'none'"><option ${b.purpose=='家教'?'selected':''}>家教</option><option ${b.purpose=='其他'?'selected':''}>其他</option></select>
- <div id="f_sw" style="${b.purpose=='家教'?'':'display:none'}"><label>家教學生${S.st.length?'':'（請先到「設定」新增學生）'}</label><select id="f_st">${stOpts(b.student)}</select></div>
- <label><input type="checkbox" id="f_r" style="width:auto" ${b.resched?'checked':''} onchange="$('#f_ow').style.display=this.checked?'':'none'"> 這堂是調課</label>
- <div id="f_ow" style="${b.resched?'':'display:none'}"><label>原本是哪一天</label><input type="date" id="f_o" value="${b.orig||''}"></div>
+ <label>用途</label><select id="f_p" onchange="pc()">${P.map(p=>`<option ${b.purpose==p?'selected':''}>${p}</option>`).join('')}</select>
+ <div id="f_sw"><label>家教學生${S.st.length?'':'（請先到「管理」新增學生）'}</label><select id="f_st">${stOpts(b.student)}</select></div>
+ <div id="f_jw"><label>工作名稱（什麼工作）</label><input id="f_j" list="jl" value="${esc(b.job||'')}" onchange="jc()"><datalist id="jl">${jobs.map(j=>`<option value="${esc(j)}">`).join('')}</datalist><label>時薪（元）</label><input type="number" id="f_rt" value="${b.rate||''}"></div>
+ <div id="f_rw"><label><input type="checkbox" id="f_r" style="width:auto" ${b.resched?'checked':''} onchange="$('#f_ow').style.display=this.checked?'':'none'"> 這堂是調課</label>
+ <div id="f_ow" style="${b.resched?'':'display:none'}"><label>原本是哪一天</label><input type="date" id="f_o" value="${b.orig||''}"></div></div>
  ${id?'':'<label>每週重複（共幾週，1 = 不重複）</label><input type="number" id="f_n" min="1" max="52" value="1">'}
- <div class="bar" style="margin-top:14px"><button class="pri" onclick="sv('${id||''}')">儲存</button><button onclick="$('#dlg').close()">取消</button>${id?`<span class="sp"></span><button class="del" onclick="if(confirm('刪除這筆？')){wr(()=>DB.doc('bookings/${id}').delete());$('#dlg').close()}">刪除</button>`:''}</div>`;
- $('#dlg').showModal()}
+ <div class="bar" style="margin-top:14px"><button class="pri" onclick="sv('${id||''}')">儲存</button><button onclick="$('#dlg').close()">取消</button>${id?`<span class="sp"></span><button class="del" onclick="if(confirm('刪除這筆？')){wr(()=>DB.doc('${w?'works':'bookings'}/${id}').delete());$('#dlg').close()}">刪除</button>`:''}</div>`;
+ $('#dlg').showModal();pc()}
+function pc(){const p=$('#f_p').value;$('#f_sw').style.display=p=='家教'?'':'none';$('#f_jw').style.display=p=='工作'?'':'none';$('#f_rw').style.display=p=='工作'?'none':''}
+function jc(){const j=$('#f_j').value.trim(),x=[...S.wk].reverse().find(w=>w.job==j);if(x&&!$('#f_rt').value)$('#f_rt').value=x.rate}
 function pay(id,v){wr(()=>DB.doc('bookings/'+id).update({paid:v,paidDate:v?fd(new Date()):''}))}
 function payAll(v){const L=flt(1).filter(b=>b.purpose=='家教');if(!L.length)return alert('目前沒有符合的家教紀錄');if(!confirm('把目前篩選出的 '+L.length+' 堂標為'+(v?'已收':'未收')+'？'))return;wr(async()=>{for(const b of L)await DB.doc('bookings/'+b.id).update({paid:v,paidDate:v?fd(new Date()):''})})}
 function sv(id){
- const o={date:$('#f_d').value,start:$('#f_s').value,end:$('#f_e').value,purpose:$('#f_p').value,student:'',resched:$('#f_r').checked?1:0,orig:''};
- if(o.purpose=='家教'){o.student=$('#f_st').value;if(!o.student)return alert('請選擇學生')}
- if(o.resched){o.orig=$('#f_o').value;if(!o.orig)return alert('請填原本上課日期')}
- if(!o.date||!o.start||!o.end||tm(o.end)<=tm(o.start))return alert('請確認日期與時間（結束要晚於開始）');
- const n=id?1:Math.max(1,Math.min(52,+$('#f_n').value||1)),list=[];
- for(let i=0;i<n;i++)list.push(Object.assign({},o,{date:fd(add(pdt(o.date),7*i)),id:id||Date.now().toString(36)+Math.random().toString(36).slice(2,6)}));
- if(id){const e=S.bk.find(y=>y.id==id)||{};list[0].paid=!!e.paid;list[0].paidDate=e.paidDate||''}else list.forEach(x=>{x.paid=false;x.paidDate=''});
- const clash=list.filter(x=>S.bk.some(y=>y.id!=x.id&&y.date==x.date&&tm(y.start)<tm(x.end)&&tm(x.start)<tm(y.end)));
- if(clash.length&&!confirm('有 '+clash.length+' 堂與既有借用時段重疊（'+clash[0].date+' 起），仍要儲存？'))return;
- wr(async()=>{for(const x of list)await DB.doc('bookings/'+x.id).set(x);$('#dlg').close()})}
+ const p=$('#f_p').value,isW=p=='工作',date=$('#f_d').value,start=$('#f_s').value,end=$('#f_e').value;
+ if(!date||!start||!end||tm(end)<=tm(start))return alert('請確認日期與時間（結束要晚於開始）');
+ const n=id?1:Math.max(1,Math.min(52,+$('#f_n').value||1)),wasW=!!id&&S.wk.some(x=>x.id==id),o={date,start,end},list=[];
+ if(isW){o.job=$('#f_j').value.trim();o.rate=+$('#f_rt').value||0;if(!o.job)return alert('請填工作名稱')}
+ else{Object.assign(o,{purpose:p,student:'',resched:$('#f_r').checked?1:0,orig:''});
+  if(p=='家教'){o.student=$('#f_st').value;if(!o.student)return alert('請選擇學生')}
+  if(o.resched){o.orig=$('#f_o').value;if(!o.orig)return alert('請填原本上課日期')}}
+ for(let i=0;i<n;i++)list.push(Object.assign({},o,{date:fd(add(pdt(date),7*i)),id:id||Date.now().toString(36)+Math.random().toString(36).slice(2,6)}));
+ if(!isW){
+  if(id){const e=S.bk.find(y=>y.id==id)||{};list[0].paid=!!e.paid;list[0].paidDate=e.paidDate||''}else list.forEach(x=>{x.paid=false;x.paidDate=''});
+  const clash=list.filter(x=>S.bk.some(y=>y.id!=x.id&&y.date==x.date&&tm(y.start)<tm(x.end)&&tm(x.start)<tm(y.end)));
+  if(clash.length&&!confirm('有 '+clash.length+' 堂與既有借用時段重疊（'+clash[0].date+' 起），仍要儲存？'))return}
+ wr(async()=>{const col=isW?'works':'bookings';for(const x of list)await DB.doc(col+'/'+x.id).set(x);if(id&&wasW!=isW)await DB.doc((wasW?'works/':'bookings/')+id).delete();$('#dlg').close()})}
 let L={},unsubs=[],dun=[],dkey='',rsub=0;
 const stop=a=>{a.forEach(f=>f());a.length=0};
 const perr=e=>{console.error(e);if(e.code!='permission-denied')$('#app').innerHTML='<div class="card">讀取失敗：'+esc(e.message)+'</div>'};
 const mapd=s=>s.docs.map(d=>Object.assign({id:d.id},d.data()));
 const rcb=s=>{S.roles=mapd(s);L.roles=1;recalc()};
-function reset(){stop(unsubs);stop(dun);L={};dkey='';rsub=0;S.bk=[];S.st=[];S.roles=[];S.mem={};S.pend=[];me.id=null;me.admin=false}
+function reset(){stop(unsubs);stop(dun);L={};dkey='';rsub=0;S.bk=[];S.st=[];S.roles=[];S.mem={};S.pend=[];S.wk=[];me.id=null;me.admin=false}
 function recalc(){
  const m=S.mem[me.id],r=m&&S.roles.find(x=>x.id==m.role);
  if(!me.admin&&m&&!rsub){rsub=1;unsubs.push(DB.collection('roles').onSnapshot(rcb,perr))}
@@ -165,7 +180,7 @@ function recalc(){
    else{const qb=all?DB.collection('bookings'):DB.collection('bookings').where('student','==',m.student);
     const qs=all?DB.collection('students'):DB.collection('students').where('name','==',m.student);
     dun.push(qb.onSnapshot(s=>{S.bk=mapd(s);L.bk=1;go()},perr),qs.onSnapshot(s=>{S.st=mapd(s);L.st=1;go()},perr));}
-   dun.push(DB.doc('settings/main').onSnapshot(d=>{S.room=d.exists?d.data().room:300;go()},perr))}}
+   dun.push(DB.doc('settings/main').onSnapshot(d=>{S.room=d.exists?d.data().room:300;go()},perr));if(me.admin)dun.push(DB.collection('works').onSnapshot(s=>{S.wk=mapd(s);go()},perr))}}
  go()}
 async function enter(u){
  reset();me.id=u.uid;me.name=u.displayName||u.email||'使用者';me.email=u.email||'';
