@@ -126,9 +126,9 @@ ${S.roles.map(r=>`<div class="bar"><input value="${esc(r.name)}" style="width:12
 <div class="card"><b>待加入</b><div class="mu">對方用 Email 或 Google 登入一次後，會出現在這裡。</div>${S.pend.filter(p=>!S.mem[p.id]).map(p=>`<div class="bar sw"><span style="flex:1;min-width:140px">${esc(p.name)} <span class="mu">${esc(p.email)}</span></span><button class="pri" onclick="madd('${p.id}')">加入</button><button class="del" onclick="wr(()=>DB.doc('pending/${p.id}').delete())">忽略</button></div>`).join('')||'<div class="mu">目前沒有人在等待</div>'}</div>
 <div class="card"><b>成員</b>${Object.keys(S.mem).map(id=>{const m=S.mem[id];return `<div class="bar sw"><span style="flex:1;min-width:140px">${esc(m.name||'')} <span class="mu">${esc(m.email||'')}</span></span><select onchange="wr(()=>DB.doc('members/${id}').update({role:this.value}))">${S.roles.map(x=>`<option value="${x.id}" ${x.id==m.role?'selected':''}>${esc(x.name)}</option>`).join('')}</select><select onchange="wr(()=>DB.doc('members/${id}').update({student:this.value}))"><option value="">（不綁定學生）</option>${stOpts(m.student)}</select><button class="del" onclick="wr(()=>DB.doc('members/${id}').delete())">移除</button></div>`}).join('')||'<div class="mu">還沒有成員</div>'}
 <div class="mu">「只看自己」的身分由資料庫規則真正限制，只讀得到綁定學生的資料。</div></div>
-<div class="card"><b>工作清單（其他工作）</b><div class="mu">先在這裡新增工作和時薪，之後新增行程時直接用選的。</div>${S.jobs.map((j,i)=>`<div class="bar"><span style="flex:1">${esc(j.name)}</span><input type="number" style="width:100px" value="${j.rate}" onchange="jrate(${i},this.value)"><button class="del" onclick="jdel(${i})">刪除</button></div>`).join('')}
+<div class="card"><b>工作清單（其他工作）</b><div class="mu">先在這裡新增工作和時薪，之後新增行程時直接用選的。</div>${S.jobs.map((j,i)=>`<div class="bar sw"><span style="flex:1;min-width:90px">${esc(j.name)} <span class="mu">${S.wk.filter(w=>w.job==j.name).length} 筆</span></span><input type="number" style="width:90px" value="${j.rate}" onchange="jrate(${i},this.value)"><button onclick="jren(${i})">改名</button><button class="del" onclick="jdel(${i})">刪除</button></div>`).join('')}
 <div class="bar"><input id="jn" placeholder="工作名稱" style="flex:1"><input id="jr" type="number" placeholder="時薪" style="width:100px"><button class="pri" onclick="jadd()">新增</button></div></div>
-<div class="card"><b>教室費用</b><label>每小時教室借用費（元）</label><input type="number" value="${S.room}" onchange="wr(()=>DB.doc('settings/main').set({room:+this.value||0}))"></div>
+${wlist()}<div class="card"><b>教室費用</b><label>每小時教室借用費（元）</label><input type="number" value="${S.room}" onchange="wr(()=>DB.doc('settings/main').set({room:+this.value||0}))"></div>
 <div class="card"><b>學生與時薪</b>${S.st.map(s=>`<div class="bar"><span style="flex:1">${esc(s.name)}</span><input type="number" style="width:100px" value="${s.rate}" onchange="wr(()=>DB.doc('students/${s.id}').update({rate:+this.value||0}))"><button class="del" onclick="if(confirm('刪除這位學生？既有借用紀錄不會被刪'))wr(()=>DB.doc('students/${s.id}').delete())">刪除</button></div>`).join('')}
 <div class="bar"><input id="nn" placeholder="學生姓名" style="flex:1"><input id="nr" type="number" placeholder="時薪" style="width:100px"><button class="pri" onclick="addSt()">新增</button></div></div>
 <div class="card"><b>備份／匯入</b><div class="bar" style="margin-top:6px"><button onclick="exp()">匯出 JSON</button><input type="file" accept=".json" onchange="imp(this)"></div><div class="mu">可匯入舊版（單機版）匯出的備份，會加入現有資料。</div></div>`}
@@ -142,10 +142,10 @@ function imp(el){const f=el.files[0];if(!f)return;const r=new FileReader();r.onl
  if(!confirm('要匯入 '+d.bk.length+' 筆借用紀錄嗎？'))return;
  wr(async()=>{for(const s of d.st||[])if(!S.st.some(x=>x.name===s.name))await DB.collection('students').add({name:s.name,rate:s.rate||0});
  for(const b of d.bk)await DB.doc('bookings/'+b.id).set(b);if(d.room)await DB.doc('settings/main').set({room:d.room});alert('匯入完成')})};r.readAsText(f)}
-function edit(id,date){
+function edit(id,date,pw){
  if(!can('edit'))return;
  const w=id&&S.wk.find(x=>x.id==id);
- const b=w?{date:w.date,start:w.start,end:w.end,purpose:'工作',student:'',resched:0,orig:'',job:w.job,rate:w.rate}:id?S.bk.find(x=>x.id==id):{date:date||fd(new Date()),start:'18:00',end:'20:00',purpose:'家教',student:(S.st[0]||{}).name||'',resched:0,orig:''};
+ const b=w?{date:w.date,start:w.start,end:w.end,purpose:'工作',student:'',resched:0,orig:'',job:w.job,rate:w.rate}:id?S.bk.find(x=>x.id==id):{date:date||fd(new Date()),start:'18:00',end:'20:00',purpose:pw?'工作':'家教',student:(S.st[0]||{}).name||'',resched:0,orig:''};
  const P=['家教','其他'].concat(me.admin?['工作']:[]),jobs=[...new Set(S.wk.map(x=>x.job))];
  $('#dlg').innerHTML=`<b>${id?'編輯':'新增'}行程</b><label>日期</label><input type="date" id="f_d" value="${b.date}">
  <div class="row"><div><label>開始</label><input type="time" id="f_s" value="${b.start}"></div><div><label>結束</label><input type="time" id="f_e" value="${b.end}"></div></div>
@@ -157,6 +157,12 @@ function edit(id,date){
  ${id?'':'<label>每週重複（共幾週，1 = 不重複）</label><input type="number" id="f_n" min="1" max="52" value="1">'}
  <div class="bar" style="margin-top:14px"><button class="pri" onclick="sv('${id||''}')">儲存</button><button onclick="$('#dlg').close()">取消</button>${id?`<span class="sp"></span><button class="del" onclick="if(confirm('刪除這筆？')){wr(()=>DB.doc('${w?'works':'bookings'}/${id}').delete());$('#dlg').close()}">刪除</button>`:''}</div>`;
  $('#dlg').showModal();pc()}
+function jren(i){const o=S.jobs[i].name,n=(prompt('新的工作名稱',o)||'').trim();if(!n||n==o)return;if(S.jobs.some(j=>j.name===n))return alert('已有同名的工作');wr(async()=>{await DB.doc('works/_jobs').set({list:S.jobs.map((j,k)=>k==i?{name:n,rate:j.rate}:j)});for(const w of S.wk.filter(x=>x.job==o))await DB.doc('works/'+w.id).update({job:n})})}
+function wdel(id){if(confirm('刪除這筆工作紀錄？'))wr(()=>DB.doc('works/'+id).delete())}
+let AJ='';
+function wlist(){const L=S.wk.filter(w=>!AJ||w.job==AJ).sort((a,b)=>(b.date+b.start).localeCompare(a.date+a.start));
+ return `<div class="card"><b>工作紀錄管理</b><div class="bar sw" style="margin:8px 0"><select onchange="AJ=this.value;go()"><option value="">全部工作</option>${[...new Set(S.wk.map(w=>w.job))].map(j=>`<option ${j==AJ?'selected':''}>${esc(j)}</option>`).join('')}</select><button class="pri" onclick="edit(null,'',1)">＋ 新增工作行程</button></div><div class="mu">共 ${L.length} 筆</div>
+ <div class="scroll" style="max-height:360px;overflow-y:auto"><table><tr><th>日期</th><th>時間</th><th>工作</th><th class="r">時薪</th><th class="r">時數</th><th class="r">薪資</th><th></th></tr>${L.map(w=>`<tr><td>${w.date}（${wd(pdt(w.date))}）</td><td>${w.start}-${w.end}</td><td>${esc(w.job)}</td><td class="r">${money(w.rate)}</td><td class="r">${hrs(w)}</td><td class="r">${money(hrs(w)*w.rate)}</td><td><button onclick="edit('${w.id}')">編輯</button> <button class="del" onclick="wdel('${w.id}')">刪除</button></td></tr>`).join('')||'<tr><td colspan=7 class="mu">沒有工作紀錄</td></tr>'}</table></div></div>`}
 function pc(){const p=$('#f_p').value;$('#f_sw').style.display=p=='家教'?'':'none';$('#f_jw').style.display=p=='工作'?'':'none';$('#f_rw').style.display=p=='工作'?'none':'';if(p=='工作'&&!$('#f_rt').value)jc()}
 function jc(){const j=S.jobs.find(x=>x.name==$('#f_j').value);if(j)$('#f_rt').value=j.rate}
 function jobOpts(sel){return [...new Set(S.jobs.map(j=>j.name).concat(sel?[sel]:[]))].map(n=>`<option ${n==sel?'selected':''}>${esc(n)}</option>`).join('')}
